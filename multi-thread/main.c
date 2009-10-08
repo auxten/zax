@@ -29,43 +29,64 @@ void * indexWorker(void * rng) {
     CHAIN *index_p,*lck_index;
     CHAIN *new_node, *old_next;
     unsigned int * rnge;
+    LAST_CHAIN last_chain = {{-1,-1},-1};
 
     rnge = (unsigned int *)rng;
     for (tmp_p=*rnge;tmp_p < *(rnge+1);tmp_p++) {
         i=(unsigned char)(*(file_buf+tmp_p));
         j=(unsigned char)(*(file_buf+tmp_p+1));
+
         //	printf("#i=%u,j=%u#",i,j);
         index_p = &hash_index[i][j];
         //block until lock the mutex
         lck_index = index_p;
         new_node = malloc(sizeof(CHAIN));
         pthread_mutex_lock (&(lck_index->lock_chain));
-        if (index_p->position == -1) {
-            index_p->position = tmp_p;
-            free(new_node);
-            //if the chain head position bigger than tmp_p;do sth please!:p
-        } else if (index_p->position > tmp_p) {
-            new_node->next = index_p->next;
-            new_node->position = index_p->position;
-            index_p->position = tmp_p;
-            index_p->next = new_node;
-        } else {
-            while (1) {
-                if (index_p->next == INITIALIZE)
-                    break;
-                else
-                    if (index_p->next->position > tmp_p) break;
-                index_p=index_p->next;
-            }
-            //insert new position
-            //NULL -> INITIALIZE
+
+        if ( i == last_chain.last2char[0] && j == last_chain.last2char[1]) {
+        // if i,j match the last insert last2char;process it with quick insert below
+            index_p = last_chain.chain_position;
             old_next = index_p->next;
             index_p->next=new_node;
             new_node->next = old_next;
-            new_node->position=tmp_p;
+            new_node->position = tmp_p;
+            last_chain.chain_position = new_node;
+        } else {
+            if (index_p->position == -1) {
+                index_p->position = tmp_p;
+                // move out free(new_node),for efficien
+                free(new_node);
+                last_chain.chain_position = index_p;
+            } else if (index_p->position > tmp_p) {
+             //if the chain head position bigger than tmp_p;change the header!:p
+                new_node->next = index_p->next;
+                new_node->position = index_p->position;
+                index_p->position = tmp_p;
+                index_p->next = new_node;
+                last_chain.chain_position = index_p;
+            } else {
+                while (1) {
+                    if (index_p->next == INITIALIZE)
+                        break;
+                    else
+                        if (index_p->next->position > tmp_p) break;
+                    index_p=index_p->next;
+                }
+                //insert new position
+                //NULL -> INITIALIZE
+                old_next = index_p->next;
+                index_p->next=new_node;
+                new_node->next = old_next;
+                new_node->position=tmp_p;
+                last_chain.chain_position = new_node;
+            }
         }
         //unlock the hash_index[i][j].lock_chain
         pthread_mutex_unlock (&(lck_index->lock_chain));
+        //record the last insert info,for quick insert next time
+        last_chain.last2char[0] = i;
+        last_chain.last2char[1] = j;
+
     }
     pthread_exit((void *)0);
     //printf("\n mk_index success\n");

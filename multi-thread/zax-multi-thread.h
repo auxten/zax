@@ -40,6 +40,10 @@ typedef struct rawcode_chain {
     unsigned char code[3];
     struct rawcode_chain * next;
 } CODE;
+typedef struct _last_chain {
+        int last2char[2];
+        CHAIN * chain_position;
+} LAST_CHAIN;
 
 CODE * raw_code=NULL;
 CHAIN hash_index[256][256];
